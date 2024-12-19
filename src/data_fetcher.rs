@@ -43,6 +43,8 @@ impl DataFetcher {
             self.base_url, symbol, self.api_key
         );
     
+        let raw_response = self.client.get(&url).send().await?.text().await?;
+    
         if raw_response.contains("\"error\"") {
             println!("API error for {}: {}", symbol, raw_response);
             return Ok(Vec::new());
@@ -91,7 +93,7 @@ impl DataFetcher {
             }
             Err(e) => {
                 println!("Failed to parse JSON response for {}: {}", symbol, e);
-                Ok(Vec::new())
+                Ok(Vec::new()) 
             }
         }
     }    
