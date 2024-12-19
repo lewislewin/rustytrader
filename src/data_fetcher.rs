@@ -1,7 +1,7 @@
 use reqwest::Client;
 use serde::Deserialize;
 
-#[derive(Deserialize)]
+#[derive(Debug)]
 pub struct StockData {
     pub timestamp: String,
     pub open: f64,
@@ -9,6 +9,17 @@ pub struct StockData {
     pub low: f64,
     pub close: f64,
     pub volume: u64,
+}
+
+#[derive(Deserialize)]
+struct FinnhubCandle {
+    c: Option<Vec<f64>>, // Close prices
+    h: Option<Vec<f64>>, // High prices
+    l: Option<Vec<f64>>, // Low prices
+    o: Option<Vec<f64>>, // Open prices
+    t: Option<Vec<i64>>, // Timestamps
+    v: Option<Vec<f64>>, // Volumes
+    s: String,           // Status
 }
 
 pub struct DataFetcher {
@@ -31,8 +42,65 @@ impl DataFetcher {
             "{}/stock/candle?symbol={}&resolution=1&from=1609459200&to=1672531200&token={}",
             self.base_url, symbol, self.api_key
         );
-
-        let response = self.client.get(&url).send().await?.json::<Vec<StockData>>().await?;
-        Ok(response)
-    }
+    
+        // Fetch and debug the raw response
+        let raw_response = self.client.get(&url).send().await?.text().await?;
+        println!("Raw response: {}", raw_response);
+    
+        // Check for an error in the raw response
+        if raw_response.contains("\"error\"") {
+            println!("API error for {}: {}", symbol, raw_response);
+            return Ok(Vec::new());
+        }
+    
+        // Parse the response as JSON
+        let response: Result<FinnhubCandle, _> = serde_json::from_str(&raw_response);
+    
+        match response {
+            Ok(parsed) => {
+                if parsed.s != "ok" {
+                    println!("API returned a non-ok status for {}: {}", symbol, parsed.s);
+                    return Ok(Vec::new());
+                }
+    
+                // Ensure all fields exist and have the same length
+                let (c, h, l, o, t, v) = match (
+                    parsed.c,
+                    parsed.h,
+                    parsed.l,
+                    parsed.o,
+                    parsed.t,
+                    parsed.v,
+                ) {
+                    (Some(c), Some(h), Some(l), Some(o), Some(t), Some(v)) if c.len() == t.len() => {
+                        (c, h, l, o, t, v)
+                    }
+                    _ => {
+                        println!("Incomplete or mismatched data for {}", symbol);
+                        return Ok(Vec::new());
+                    }
+                };
+    
+                // Map data into StockData
+                let stock_data: Vec<StockData> = t
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, timestamp)| StockData {
+                        timestamp: timestamp.to_string(),
+                        open: o[i],
+                        high: h[i],
+                        low: l[i],
+                        close: c[i],
+                        volume: v[i] as u64,
+                    })
+                    .collect();
+    
+                Ok(stock_data)
+            }
+            Err(e) => {
+                println!("Failed to parse JSON response for {}: {}", symbol, e);
+                Ok(Vec::new()) // Return empty data on failure
+            }
+        }
+    }    
 }

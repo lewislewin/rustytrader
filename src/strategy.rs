@@ -1,7 +1,14 @@
 use crate::data_fetcher::StockData;
 
-pub trait TradingStrategy {
+pub trait TradingStrategy: Send + Sync {
     fn decide(&self, data: &[StockData]) -> Option<TradeDecision>;
+}
+
+#[derive(Debug, Clone)]
+pub enum TradeDecision {
+    Buy,
+    Sell,
+    Hold,
 }
 
 pub struct MovingAverageStrategy {
@@ -24,24 +31,24 @@ impl MovingAverageStrategy {
 
 impl TradingStrategy for MovingAverageStrategy {
     fn decide(&self, data: &[StockData]) -> Option<TradeDecision> {
-        let close_prices: Vec<f64> = data.iter().map(|d| d.close).collect();
+        if data.len() < self.long_window {
+            return None;
+        }
 
+        let close_prices: Vec<f64> = data.iter().map(|d| d.close).collect();
         let short_ma = self.moving_average(&close_prices, self.short_window);
         let long_ma = self.moving_average(&close_prices, self.long_window);
 
-        if short_ma.last() > long_ma.last() {
-            Some(TradeDecision::Buy)
-        } else if short_ma.last() < long_ma.last() {
-            Some(TradeDecision::Sell)
+        if let (Some(&s), Some(&l)) = (short_ma.last(), long_ma.last()) {
+            if s > l {
+                Some(TradeDecision::Buy)
+            } else if s < l {
+                Some(TradeDecision::Sell)
+            } else {
+                Some(TradeDecision::Hold)
+            }
         } else {
             None
         }
     }
-}
-
-#[derive(Debug, Clone)]
-pub enum TradeDecision {
-    Buy,
-    Sell,
-    Hold,
 }

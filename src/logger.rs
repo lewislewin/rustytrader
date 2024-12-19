@@ -1,5 +1,6 @@
 use std::fs::OpenOptions;
 use std::io::Write;
+use chrono::Local;
 
 pub fn log_trade(trade: &str) {
     let mut file = OpenOptions::new()
@@ -8,5 +9,6 @@ pub fn log_trade(trade: &str) {
         .open("trades.log")
         .unwrap();
 
-    writeln!(file, "{}", trade).unwrap();
+    let now = Local::now().format("%Y-%m-%d %H:%M:%S");
+    writeln!(file, "[{}] {}", now, trade).unwrap();
 }
