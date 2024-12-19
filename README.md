@@ -1,0 +1,1 @@
+A small trading simulator for experimenting with async rust, channels and rust architecture.
