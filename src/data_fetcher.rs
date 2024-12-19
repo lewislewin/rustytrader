@@ -43,17 +43,11 @@ impl DataFetcher {
             self.base_url, symbol, self.api_key
         );
     
-        // Fetch and debug the raw response
-        let raw_response = self.client.get(&url).send().await?.text().await?;
-        println!("Raw response: {}", raw_response);
-    
-        // Check for an error in the raw response
         if raw_response.contains("\"error\"") {
             println!("API error for {}: {}", symbol, raw_response);
             return Ok(Vec::new());
         }
     
-        // Parse the response as JSON
         let response: Result<FinnhubCandle, _> = serde_json::from_str(&raw_response);
     
         match response {
@@ -63,7 +57,6 @@ impl DataFetcher {
                     return Ok(Vec::new());
                 }
     
-                // Ensure all fields exist and have the same length
                 let (c, h, l, o, t, v) = match (
                     parsed.c,
                     parsed.h,
@@ -81,7 +74,6 @@ impl DataFetcher {
                     }
                 };
     
-                // Map data into StockData
                 let stock_data: Vec<StockData> = t
                     .into_iter()
                     .enumerate()
@@ -99,7 +91,7 @@ impl DataFetcher {
             }
             Err(e) => {
                 println!("Failed to parse JSON response for {}: {}", symbol, e);
-                Ok(Vec::new()) // Return empty data on failure
+                Ok(Vec::new())
             }
         }
     }    
